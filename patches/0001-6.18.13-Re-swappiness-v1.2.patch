@@ -1,14 +1,14 @@
-From 5174d03039530eb83d102a0866b52e5972dd2fa9 Mon Sep 17 00:00:00 2001
+From 280408b2227a0c31b7fe70c439a56d85521e46ed Mon Sep 17 00:00:00 2001
 From: Masahito S <firelzrd@gmail.com>
-Date: Tue, 24 Feb 2026 16:26:28 +0900
-Subject: [PATCH] 6.18.13-Re-swappiness-v1.1
+Date: Sun, 8 Mar 2026 16:58:14 +0900
+Subject: [PATCH] 6.18.13-Re-swappiness-v1.2
 
 ---
  include/linux/mm_inline.h |  16 +-
  include/linux/mmzone.h    |  29 ++-
  mm/vmscan.c               | 377 ++++++++++++++++++++++++--------------
- mm/workingset.c           |   9 +-
- 4 files changed, 262 insertions(+), 169 deletions(-)
+ mm/workingset.c           |  12 +-
+ 4 files changed, 264 insertions(+), 170 deletions(-)
 
 diff --git a/include/linux/mm_inline.h b/include/linux/mm_inline.h
 index f6a2b2d200..6aa6410103 100644
@@ -142,7 +142,7 @@ index 7fb7331c57..95c08e8bee 100644
  	unsigned long next_addr;
  	/* to batch promoted pages */
 diff --git a/mm/vmscan.c b/mm/vmscan.c
-index b2fc8b626d..1491c0770d 100644
+index b2fc8b626d..14c69d9116 100644
 --- a/mm/vmscan.c
 +++ b/mm/vmscan.c
 @@ -879,6 +879,12 @@ enum folio_references {
@@ -153,7 +153,7 @@ index b2fc8b626d..1491c0770d 100644
 +#define RESWAPPINESS_PROGNAME	"Re-swappiness: MGLRU anon/file independent aging"
 +#define RESWAPPINESS_AUTHOR		"Masahito Suzuki"
 +
-+#define RESWAPPINESS_VERSION	"1.1"
++#define RESWAPPINESS_VERSION	"1.2"
 +
  /*
   * Only used on a mapped folio in the eviction (rmap walk) path, where promotion
@@ -959,7 +959,7 @@ index b2fc8b626d..1491c0770d 100644
  		pr_err("lru_gen: failed to create sysfs group\n");
  
 diff --git a/mm/workingset.c b/mm/workingset.c
-index 68a76a9111..06fe983a7d 100644
+index 68a76a9111..3f00493e4f 100644
 --- a/mm/workingset.c
 +++ b/mm/workingset.c
 @@ -262,7 +262,8 @@ static void *lru_gen_eviction(struct folio *folio)
@@ -990,7 +990,17 @@ index 68a76a9111..06fe983a7d 100644
  	if (lruvec != folio_lruvec(folio))
  		goto unlock;
  
-@@ -431,7 +432,7 @@ bool workingset_test_recent(void *shadow, bool file, bool *workingset,
+@@ -331,7 +332,8 @@ static void *lru_gen_eviction(struct folio *folio)
+ }
+ 
+ static bool lru_gen_test_recent(void *shadow, struct lruvec **lruvec,
+-				unsigned long *token, bool *workingset)
++				unsigned long *token, bool *workingset,
++				int type)
+ {
+ 	return false;
+ }
+@@ -431,7 +433,7 @@ bool workingset_test_recent(void *shadow, bool file, bool *workingset,
  		bool recent;
  
  		rcu_read_lock();
